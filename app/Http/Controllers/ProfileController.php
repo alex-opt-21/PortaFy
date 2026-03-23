@@ -51,4 +51,44 @@ class ProfileController extends Controller
             ], 500);
         }
     }
+    public function crearPerfilProfesional(Request $request)
+{
+    try {
+        $usuario = $request->user();
+
+        $profile = Profile::where('usuario_id', $usuario->id)->first();
+
+        if (!$profile) {
+            return response()->json([
+                'message' => 'Primero debe completar su perfil básico'
+            ], 400);
+        }
+
+        $datos = [];
+
+        if ($request->filled('titulo'))
+            $datos['titulo'] = $request->titulo;
+
+        if ($request->filled('skills'))
+            $datos['skills'] = $request->skills;
+
+        if ($request->filled('github'))
+            $datos['github'] = $request->github;
+
+        if ($request->filled('linkedin'))
+            $datos['linkedin'] = $request->linkedin;
+
+        $profile->update($datos);
+
+        return response()->json([
+            'message' => 'Perfil profesional actualizado correctamente',
+            'profile' => $profile
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => $e->getMessage(),
+        ], 500);
+    }
+}
 }
