@@ -11,21 +11,17 @@ return new class extends Migration
      */
     public function up(): void
 {
-    Schema::create('perfiles_usuario', function (Blueprint $table) {
+    Schema::create('perfiles_usuarios', function (Blueprint $table) {
         $table->id();
-        // Relacionamos el perfil con un usuario de la tabla 'users'
-        $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-
-        // Campos que necesitas para tu tarea RF-16
+        $table->foreignId('user_id')->constrained()->onDelete('cascade'); // Relación con login
         $table->string('nombre');
         $table->string('apellido');
         $table->string('profesion')->nullable();
         $table->string('universidad')->nullable();
         $table->string('ubicacion')->nullable();
-        $table->date('fecha_nacimiento')->nullable(); // Campo que pediste
+        $table->date('fecha_nacimiento')->nullable(); // Tu campo especial
         $table->string('foto_perfil')->nullable();
-
-        $table->timestamps(); // created_at y updated_at
+        $table->timestamps();
     });
 }
 
