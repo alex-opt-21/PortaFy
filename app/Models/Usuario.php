@@ -29,5 +29,8 @@ class Usuario extends Authenticatable
     ];
 
     public $timestamps = true;
-
+    /*public function profile()
+    {
+        return $this->hasOne(Profile::class, 'usuario_id');
+    }*/
 }
