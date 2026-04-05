@@ -14,7 +14,12 @@ class UsuarioResource extends JsonResource
             'apellido' => $this->apellido,
             'email'    => $this->email,
             'rol'      => $this->rol,
-            'perfil_completado'  => $this->profile ? $this->profile->perfil_completado : false,
+            //////////
+            'biografia'          => $this->biografia,
+            'fecha_nacimiento'   => $this->fecha_nacimiento,
+            'ubicacion'          => $this->ubicacion,
+            'foto_perfil'        => $this->foto_perfil,
+            'perfil_completado'  => $this->perfil_completado ?? false,
         ];
     }
 }
