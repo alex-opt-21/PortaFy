@@ -16,6 +16,7 @@ class Usuario extends Authenticatable
         'nombre',
         'apellido',
         'email',
+        'password',
         'rol',
         'provider',
         'provider_id',
@@ -53,4 +54,5 @@ class Usuario extends Authenticatable
     {
         return $this->hasMany(FormacionAcademica::class, 'usuario_id');
     }
+
 }

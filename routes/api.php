@@ -13,9 +13,20 @@ Route::post('/reset-password',  [PasswordResetController::class, 'resetPassword'
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
 Route::get('/users/search', [ProfileController::class, 'searchUsers']);
 Route::middleware('auth:sanctum')->group(function () {
-Route::post('/perfil/completar', [ProfileController::class, 'completar']);
-Route::post('/perfil-profesional', [ProfileController::class, 'crearPerfilProfesional']);
-Route::post('/formacion', [FormacionAcademicaController::class, 'store']);
-Route::get('/formacion', [FormacionAcademicaController::class, 'index']);
+    Route::post('/formacion', [FormacionAcademicaController::class, 'store']);
+    Route::get('/formacion', [FormacionAcademicaController::class, 'index']);
 
+
+
+    // Obtener datos del perfil (GET)
+    Route::get('/perfil/me', [ProfileController::class, 'show']);
+
+    // Completar perfil inicial (POST)
+    Route::post('/perfil/completar', [ProfileController::class, 'completar']);
+
+    // Actualizar perfil existente (POST)
+    Route::post('/perfil/actualizar', [ProfileController::class, 'storeOrUpdate']);
+
+    // Si tus compañeros usan esta otra para el perfil profesional:
+    Route::post('/perfil/profesional', [ProfileController::class, 'crearPerfilProfesional']);
 });
