@@ -8,7 +8,6 @@ use Illuminate\Notifications\Notifiable;
 
 class Usuario extends Authenticatable
 {
-    use HasApiTokens;
     use HasApiTokens, Notifiable;
 
     protected $table = 'usuarios';
@@ -38,35 +37,22 @@ class Usuario extends Authenticatable
         'password',
     ];
 
-    protected function casts(): array
-    {
-        return ['password' => 'hashed'];
-    }
+    public $timestamps = true;
 
-    public function social()
-    {
-        return $this->hasMany(Social::class, 'usuario_id');
-    }
-
-    public function proyectos()
-    {
-        return $this->hasMany(Proyecto::class, 'usuario_id');
-    }
-
+    // 🔹 RELACIÓN NECESARIA PARA LA BÚSQUEDA
     public function habilidades()
     {
-        return $this->hasMany(Habilidad::class, 'usuario_id');
+        return $this->hasMany(\App\Models\Habilidad::class, 'usuario_id');
     }
 
-    public function experiencias()
+    /*public function profile()
     {
-        return $this->hasMany(Experience::class, 'usuario_id');
-    }
+        return $this->hasOne(Profile::class, 'usuario_id');
+    }*/
 
     public function formacionAcademica()
     {
         return $this->hasMany(FormacionAcademica::class, 'usuario_id');
     }
 
-    public $timestamps = true;
 }

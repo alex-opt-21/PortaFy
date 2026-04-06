@@ -11,7 +11,7 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/reset-password',  [PasswordResetController::class, 'resetPassword']);
 Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
-// Agrupamos todo lo que requiere estar logueado
+Route::get('/users/search', [ProfileController::class, 'searchUsers']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/formacion', [FormacionAcademicaController::class, 'store']);
     Route::get('/formacion', [FormacionAcademicaController::class, 'index']);
