@@ -45,6 +45,21 @@ class Usuario extends Authenticatable
         return $this->hasMany(\App\Models\Habilidad::class, 'usuario_id');
     }
 
+    public function experiences()
+    {
+        return $this->hasMany(\App\Models\Experience::class, 'usuario_id');
+    }
+
+    public function proyectos()
+    {
+        return $this->hasMany(\App\Models\Proyecto::class, 'usuario_id');
+    }
+
+    public function sociales()
+    {
+        return $this->hasMany(\App\Models\Social::class, 'usuario_id');
+    }
+
     /*public function profile()
     {
         return $this->hasOne(Profile::class, 'usuario_id');
