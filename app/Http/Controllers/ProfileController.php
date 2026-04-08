@@ -2,19 +2,121 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Profile;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 
 class ProfileController extends Controller
 {
+    private function resolveProfession(Usuario $usuario, ?object $legacyProfile): string
+    {
+        $usuarioProfesion = trim((string) ($usuario->profesion ?? ''));
+        if ($usuarioProfesion !== '') {
+            return $usuarioProfesion;
+        }
+
+        return trim((string) ($legacyProfile->profesion ?? ''));
+    }
+
+    private function mediaUrl(?string $path): string
+    {
+        if (!$path) {
+            return '';
+        }
+
+        $normalizedPath = ltrim(preg_replace('#^(public/|storage/)#', '', $path), '/');
+        $baseUrl = request()->getSchemeAndHttpHost();
+
+        return $baseUrl . '/storage/' . $normalizedPath;
+    }
+
+    private function validateProfileRequest(Request $request)
+    {
+        return Validator::make($request->all(), [
+            'foto_perfil' => ['nullable', 'image', 'max:2048'],
+            'foto_portada' => ['nullable', 'image', 'max:2048'],
+            'profesion' => ['nullable', 'string', 'max:255'],
+            'nombre' => ['nullable', 'string', 'max:255'],
+            'apellido' => ['nullable', 'string', 'max:255'],
+            'biografia' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'foto_perfil.image' => 'La foto de perfil debe ser una imagen valida.',
+            'foto_perfil.max' => 'La foto de perfil supera el limite actual de 2 MB del servidor.',
+            'foto_portada.image' => 'La portada debe ser una imagen valida.',
+            'foto_portada.max' => 'La portada supera el limite actual de 2 MB del servidor.',
+        ]);
+    }
+
+    private function getLegacyProfile(int $usuarioId): ?object
+    {
+        if (!Schema::hasTable('perfiles_usuarios')) {
+            return null;
+        }
+
+        return DB::table('perfiles_usuarios')
+            ->where('user_id', $usuarioId)
+            ->first();
+    }
+
+    private function syncLegacyProfile(Usuario $usuario, array $overrides = []): void
+    {
+        if (!Schema::hasTable('perfiles_usuarios')) {
+            return;
+        }
+
+        $legacyProfile = $this->getLegacyProfile($usuario->id);
+        $hasProfesionColumn = Schema::hasColumn('perfiles_usuarios', 'profesion');
+
+        $payload = [
+            'nombre' => $overrides['nombre'] ?? $usuario->nombre,
+            'apellido' => $overrides['apellido'] ?? $usuario->apellido,
+            'ubicacion' => $overrides['ubicacion'] ?? $usuario->ubicacion,
+            'fecha_nacimiento' => $overrides['fecha_nacimiento'] ?? $usuario->fecha_nacimiento,
+            'foto_perfil' => $overrides['foto_perfil'] ?? $usuario->foto_perfil,
+            'updated_at' => now(),
+        ];
+
+        if ($hasProfesionColumn) {
+            $payload['profesion'] = $overrides['profesion'] ?? $this->resolveProfession($usuario, $legacyProfile);
+        }
+
+        $exists = DB::table('perfiles_usuarios')
+            ->where('user_id', $usuario->id)
+            ->exists();
+
+        if ($exists) {
+            DB::table('perfiles_usuarios')
+                ->where('user_id', $usuario->id)
+                ->update($payload);
+
+            return;
+        }
+
+        DB::table('perfiles_usuarios')->insert([
+            'user_id' => $usuario->id,
+            'created_at' => now(),
+            ...$payload,
+        ]);
+    }
+
     public function storeOrUpdate(Request $request)
     {
         try {
-            $usuario = $request->user();
+            $validator = $this->validateProfileRequest($request);
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $validator->errors()->first(),
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
 
-            // Todo va directo a tabla 'usuarios'
+            $usuario = $request->user();
             $datosUsuario = [];
+            $legacyOverrides = [];
+            $hasUsuarioProfesionColumn = Schema::hasColumn('usuarios', 'profesion');
 
             if ($request->filled('nombre'))
                 $datosUsuario['nombre'] = $request->nombre;
@@ -26,6 +128,12 @@ class ProfileController extends Controller
                 $datosUsuario['ubicacion'] = $request->ubicacion;
             if ($request->filled('fecha_nacimiento'))
                 $datosUsuario['fecha_nacimiento'] = $request->fecha_nacimiento;
+            if ($request->has('profesion')) {
+                $legacyOverrides['profesion'] = trim((string) $request->input('profesion', ''));
+                if ($hasUsuarioProfesionColumn) {
+                    $datosUsuario['profesion'] = $legacyOverrides['profesion'];
+                }
+            }
 
             if ($request->hasFile('foto_perfil')) {
                 $datosUsuario['foto_perfil'] = $request->file('foto_perfil')
@@ -36,8 +144,15 @@ class ProfileController extends Controller
                     ->store('fotos_portada', 'public');
             }
 
+            $legacyOverrides = [...$datosUsuario, ...$legacyOverrides];
+
             if (!empty($datosUsuario)) {
                 $usuario->update($datosUsuario);
+                $usuario->refresh();
+            }
+
+            if (!empty($legacyOverrides)) {
+                $this->syncLegacyProfile($usuario, $legacyOverrides);
             }
 
             // Redes sociales van a tabla 'social'
@@ -68,6 +183,7 @@ class ProfileController extends Controller
     public function show(Request $request)
     {
         $usuario = $request->user();
+        $legacyProfile = $this->getLegacyProfile($usuario->id);
 
         // Traer redes sociales
         $github   = \App\Models\Social::where('usuario_id', $usuario->id)
@@ -81,11 +197,14 @@ class ProfileController extends Controller
             'nombre'             => $usuario->nombre          ?? '',
             'apellido'           => $usuario->apellido        ?? '',
             'email'              => $usuario->email           ?? '',
+            'profesion'          => $this->resolveProfession($usuario, $legacyProfile),
             'biografia'          => $usuario->biografia       ?? '',
-            'ubicacion'          => $usuario->ubicacion       ?? '',
-            'fecha_nacimiento'   => $usuario->fecha_nacimiento ?? '',
-            'foto_perfil'        => $usuario->foto_perfil     ?? '',
+            'ubicacion'          => $usuario->ubicacion ?: ($legacyProfile->ubicacion ?? ''),
+            'fecha_nacimiento'   => $usuario->fecha_nacimiento ?: ($legacyProfile->fecha_nacimiento ?? ''),
+            'foto_perfil'        => $usuario->foto_perfil ?: ($legacyProfile->foto_perfil ?? ''),
+            'foto_perfil_url'    => $this->mediaUrl($usuario->foto_perfil ?: ($legacyProfile->foto_perfil ?? '')),
             'foto_portada'       => $usuario->foto_portada    ?? '',
+            'foto_portada_url'   => $this->mediaUrl($usuario->foto_portada ?? ''),
             'perfil_completado'  => $usuario->perfil_completado ?? 0,
             'github'             => $github?->url_plataforma  ?? '',
             'linkedin'           => $linkedin?->url_plataforma ?? '',
@@ -94,6 +213,14 @@ class ProfileController extends Controller
     public function completar(Request $request)
     {
         try {
+            $validator = $this->validateProfileRequest($request);
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => $validator->errors()->first(),
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
             $usuario = $request->user();
             $datos = [];
 
@@ -113,6 +240,8 @@ class ProfileController extends Controller
 
             // guarda en usuarios
             $usuario->update($datos);
+            $usuario->refresh();
+            $this->syncLegacyProfile($usuario, $datos);
 
             return response()->json([
                 'message' => 'Perfil completado correctamente',
@@ -127,6 +256,14 @@ class ProfileController extends Controller
     public function crearPerfilProfesional(Request $request)
     {
         try {
+            $validator = $this->validateProfileRequest($request);
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => $validator->errors()->first(),
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
             $usuario = $request->user();
             // Verificar que el perfil básico esté completo
             if (!$usuario->perfil_completado) {
@@ -149,6 +286,8 @@ class ProfileController extends Controller
 
             if (!empty($datosUsuario)) {
                 $usuario->update($datosUsuario);
+                $usuario->refresh();
+                $this->syncLegacyProfile($usuario, $datosUsuario);
             }
 
             // Guardar redes sociales en tabla 'social'

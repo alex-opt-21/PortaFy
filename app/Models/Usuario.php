@@ -25,6 +25,7 @@ class Usuario extends Authenticatable
         /////
 
         'biografia',
+        'profesion',
         'fecha_nacimiento',
         'ubicacion',
         'foto_perfil',
