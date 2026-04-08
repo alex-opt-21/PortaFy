@@ -40,8 +40,8 @@ class ProjectRequest extends FormRequest
             'url_demo' => ['nullable', 'url', 'max:255'],
             'url_repositorio' => ['nullable', 'url', 'max:255'],
             'estado' => ['nullable', 'in:en_progreso,completado,pausado'],
-            'imagen' => ['nullable', 'image', 'max:5120'],
-            'cover' => ['nullable', 'image', 'max:5120'],
+            'imagen' => ['nullable', 'image', 'max:2048'],
+            'cover' => ['nullable', 'image', 'max:2048'],
         ];
     }
 
@@ -53,6 +53,8 @@ class ProjectRequest extends FormRequest
             'url_repositorio.url' => 'El enlace del repositorio debe ser un URL valido.',
             'imagen.image' => 'La portada debe ser una imagen valida.',
             'cover.image' => 'La portada debe ser una imagen valida.',
+            'imagen.max' => 'La portada no debe superar 2 MB.',
+            'cover.max' => 'La portada no debe superar 2 MB.',
         ];
     }
 
