@@ -15,7 +15,7 @@ class Proyecto extends Model
         'tecnologias',
         'url_repositorio',
         'url_demo',
-        'url_imagen',
+        'imagen',
         'estado',
     ];
 
