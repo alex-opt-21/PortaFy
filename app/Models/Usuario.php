@@ -20,10 +20,6 @@ class Usuario extends Authenticatable
         'rol',
         'provider',
         'provider_id',
-        'password',
-
-        /////
-
         'biografia',
         'profesion',
         'fecha_nacimiento',
@@ -40,7 +36,6 @@ class Usuario extends Authenticatable
 
     public $timestamps = true;
 
-    // 🔹 RELACIÓN NECESARIA PARA LA BÚSQUEDA
     public function habilidades()
     {
         return $this->hasMany(\App\Models\Habilidad::class, 'usuario_id');
@@ -61,18 +56,8 @@ class Usuario extends Authenticatable
         return $this->hasMany(\App\Models\Social::class, 'usuario_id');
     }
 
-    /*public function profile()
-    {
-        return $this->hasOne(Profile::class, 'usuario_id');
-    }*/
-
     public function formacionAcademica()
     {
         return $this->hasMany(FormacionAcademica::class, 'usuario_id');
-    }
-
-    public function proyectos()
-    {
-        return $this->hasMany(\App\Models\Proyecto::class, 'usuario_id');
     }
 }
