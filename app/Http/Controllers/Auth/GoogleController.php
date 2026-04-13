@@ -3,53 +3,51 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Services\OAuthUserService;
-use GuzzleHttp\Client;
 use Laravel\Socialite\Facades\Socialite;
+use App\Models\Usuario;
+use Illuminate\Support\Str;
+use App\Mail\BienvenidaMail;
+use Illuminate\Support\Facades\Mail;
 
 class GoogleController extends Controller
 {
-    public function __construct(private readonly OAuthUserService $oAuthUserService) {}
-
     public function redirect()
     {
-        return Socialite::driver('google')
-            ->setHttpClient(new Client(['verify' => ! app()->isLocal()]))
-            ->stateless()
-            ->scopes(['openid', 'profile', 'email'])
-            ->redirect();
+        return Socialite::driver('google')->redirect();
     }
 
     public function callback()
     {
         try {
-            $googleUser = Socialite::driver('google')
-                ->setHttpClient(new Client(['verify' => ! app()->isLocal()]))
-                ->stateless()
-                ->user();
+            $googleUser = Socialite::driver('google')->user();
 
-            $user = $this->oAuthUserService->resolveOrCreateUser(
-                'google',
-                (string) $googleUser->getId(),
-                $googleUser->getEmail(),
-                $googleUser->user['given_name'] ?? $googleUser->getName() ?? 'Usuario',
-                $googleUser->user['family_name'] ?? '',
-            );
+            $user = Usuario::where('email', $googleUser->getEmail())
+               ->where('proveedor', 'google')
+               ->first();
 
-            $token = $this->oAuthUserService->issueToken($user);
+            if (!$user) {
+                $user = Usuario::create([
+                    'email'       => $googleUser->getEmail(),
+                    'nombre'      => $googleUser->user['given_name'] ?? $googleUser->getName() ?? 'Usuario',
+                    'apellido'    => $googleUser->user['family_name'] ?? '',
+                    'proveedor'    => 'google',
+                    'proveedor_id' => $googleUser->getId(),
+                    'rol'         => 'usuario',
+                    'password'    => bcrypt(Str::random(24)),
+                    'foto_perfil' => $googleUser->getAvatar(),
+                ]);
+                Mail::to($user->email)->send(new BienvenidaMail($user));
+            }
 
-            return response()
-                ->view('google-callback', [
-                    'token' => $token,
-                    'user' => $user,
-                ])
-                ->header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-                ->header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return view('google-callback', [
+                'token' => $token,
+                'user'  => $user,
+            ]);
+
         } catch (\Exception $e) {
-            return response()
-                ->view('google-callback', ['error' => $e->getMessage()])
-                ->header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-                ->header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+            return view('google-callback', ['error' => $e->getMessage()]);
         }
     }
 }

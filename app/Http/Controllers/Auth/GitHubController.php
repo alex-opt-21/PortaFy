@@ -3,52 +3,55 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Services\OAuthUserService;
-use GuzzleHttp\Client;
 use Laravel\Socialite\Facades\Socialite;
+use App\Models\Usuario;
+use Illuminate\Support\Str;
+use App\Mail\BienvenidaMail;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 
 class GitHubController extends Controller
 {
-    public function __construct(private readonly OAuthUserService $oAuthUserService) {}
-
     public function redirect()
     {
-        return Socialite::driver('github')
-            ->setHttpClient(new Client(['verify' => ! app()->isLocal()]))
-            ->stateless()
-            ->scopes(['read:user', 'user:email'])
-            ->redirect();
+        return Socialite::driver('github')->redirect();
     }
 
     public function callback()
-    {
-        try {
-            $githubUser = Socialite::driver('github')
-                ->setHttpClient(new Client(['verify' => ! app()->isLocal()]))
-                ->stateless()
-                ->user();
+{
+    try {
+        $githubUser = Socialite::driver('github')->user();
 
-            $user = $this->oAuthUserService->resolveOrCreateUser(
-                'github',
-                (string) $githubUser->getId(),
-                $githubUser->getEmail(),
-                $githubUser->getName() ?? $githubUser->getNickname() ?? 'Usuario',
-            );
+        $user = Usuario::where('email', $githubUser->getEmail())
+           ->where('proveedor', 'github')  // FIX
+           ->first();
 
-            $token = $this->oAuthUserService->issueToken($user);
+        if (!$user) {
+    $user = Usuario::create([
+        'email'        => $githubUser->getEmail(),
+        'nombre'       => $githubUser->getName() ?? $githubUser->getNickname() ?? 'Usuario',
+        'apellido'     => '',
+        'proveedor'    => 'github',
+        'proveedor_id' => $githubUser->getId(),
+        'rol'          => 'usuario',
+        'password'     => bcrypt(Str::random(24)),
+        'foto_perfil'  => $githubUser->getAvatar(),
+    ]);
 
-            return response()
-                ->view('github-callback', [
-                    'token' => $token,
-                    'user' => $user,
-                ])
-                ->header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-                ->header('Cross-Origin-Embedder-Policy', 'unsafe-none');
-        } catch (\Exception $e) {
-            return response()
-                ->view('github-callback', ['error' => $e->getMessage()])
-                ->header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-                ->header('Cross-Origin-Embedder-Policy', 'unsafe-none');
-        }
+
+    try {
+        Mail::to($user->email)->send(new BienvenidaMail($user));
+    } catch (\Exception $mailError) {
+        Log::error('Error enviando correo de bienvenida: ' . $mailError->getMessage());
     }
+}
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return view('github-callback', ['token' => $token, 'user' => $user]);
+
+    } catch (\Exception $e) {
+        return view('github-callback', ['error' => $e->getMessage()]);
+    }
+}
 }

@@ -198,7 +198,7 @@ class ProfileService
 
     private function syncSocialLinks(ProfileRequest $request, Usuario $usuario): void
     {
-        foreach (['github', 'linkedin'] as $red) {
+        foreach (['github', 'linkedin', 'google'] as $red) {
             if ($request->filled($red)) {
                 Social::updateOrCreate(
                     Social::platformIdentity($usuario->id, $red),
@@ -210,18 +210,18 @@ class ProfileService
 
     private function getLegacyProfile(int $usuarioId): ?object
     {
-        if (! $this->hasTable('perfiles_usuarios')) {
+        if (! $this->hasTable('usuarios')) {
             return null;
         }
 
-        return DB::table('perfiles_usuarios')
-            ->where('user_id', $usuarioId)
+        return DB::table('usuarios')
+            ->where('id', $usuarioId)
             ->first();
     }
 
     private function syncLegacyProfile(Usuario $usuario, array $overrides = []): void
     {
-        if (! $this->hasTable('perfiles_usuarios')) {
+        if (! $this->hasTable('usuarios')) {
             return;
         }
 
@@ -236,20 +236,20 @@ class ProfileService
             'updated_at' => now(),
         ];
 
-        if ($this->hasColumn('perfiles_usuarios', 'profesion')) {
+        if ($this->hasColumn('usuarios', 'profesion')) {
             $payload['profesion'] = $overrides['profesion'] ?? $this->resolveProfession($usuario, $legacyProfile);
         }
 
         if ($legacyProfile) {
-            DB::table('perfiles_usuarios')
-                ->where('user_id', $usuario->id)
+            DB::table('usuarios')
+                ->where('id', $usuario->id)
                 ->update($payload);
 
             return;
         }
 
-        DB::table('perfiles_usuarios')->insert([
-            'user_id' => $usuario->id,
+        DB::table('usuarios')->insert([
+            'id' => $usuario->id,
             'created_at' => now(),
             ...$payload,
         ]);

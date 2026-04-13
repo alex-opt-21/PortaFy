@@ -3,53 +3,49 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Services\OAuthUserService;
-use GuzzleHttp\Client;
 use Laravel\Socialite\Facades\Socialite;
+use App\Models\Usuario;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use App\Mail\BienvenidaMail;
+use Illuminate\Support\Facades\Mail;
 
 class LinkedInController extends Controller
 {
-    public function __construct(private readonly OAuthUserService $oAuthUserService) {}
-
     public function redirect()
     {
-        return Socialite::driver('linkedin-openid')
-            ->setHttpClient(new Client(['verify' => ! app()->isLocal()]))
-            ->stateless()
-            ->scopes(['openid', 'profile', 'email'])
-            ->redirect();
+        return Socialite::driver('linkedin-openid')->redirect();
     }
 
     public function callback()
-    {
-        try {
-            $linkedinUser = Socialite::driver('linkedin-openid')
-                ->setHttpClient(new Client(['verify' => ! app()->isLocal()]))
-                ->stateless()
-                ->user();
+{
+    try {
+        $linkedinUser = Socialite::driver('linkedin-openid')->user();
 
-            $user = $this->oAuthUserService->resolveOrCreateUser(
-                'linkedin',
-                (string) $linkedinUser->getId(),
-                $linkedinUser->getEmail(),
-                $linkedinUser->user['given_name'] ?? $linkedinUser->getName() ?? 'Usuario',
-                $linkedinUser->user['family_name'] ?? '',
-            );
+        $user = Usuario::where('email', $linkedinUser->getEmail())
+           ->where('proveedor', 'linkedin')  // FIX
+           ->first();
 
-            $token = $this->oAuthUserService->issueToken($user);
-
-            return response()
-                ->view('linkedin-callback', [
-                    'token' => $token,
-                    'user' => $user,
-                ])
-                ->header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-                ->header('Cross-Origin-Embedder-Policy', 'unsafe-none');
-        } catch (\Exception $e) {
-            return response()
-                ->view('linkedin-callback', ['error' => $e->getMessage()])
-                ->header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-                ->header('Cross-Origin-Embedder-Policy', 'unsafe-none');
+        if (!$user) {
+            $user = Usuario::create([
+                'email'        => $linkedinUser->getEmail(),
+                'nombre'       => $linkedinUser->user['given_name'] ?? $linkedinUser->getName() ?? 'Usuario',
+                'apellido'     => $linkedinUser->user['family_name'] ?? '',
+                'proveedor'    => 'linkedin',     // FIX
+                'proveedor_id' => $linkedinUser->getId(), // FIX
+                'rol'          => 'usuario',
+                'password'     => bcrypt(Str::random(24)),
+                'foto_perfil'  => $linkedinUser->getAvatar(),
+            ]);
+            Mail::to($user->email)->send(new BienvenidaMail($user));
         }
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return view('linkedin-callback', ['token' => $token, 'user' => $user]);
+
+    } catch (\Exception $e) {
+        return view('linkedin-callback', ['error' => $e->getMessage()]);
     }
+}
 }
