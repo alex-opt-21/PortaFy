@@ -1,0 +1,1 @@
+function e(e){return e?.perfil_completado?`/feed`:`/forms`}export{e as t};
