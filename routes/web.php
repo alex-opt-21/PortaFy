@@ -12,6 +12,6 @@ Route::get('/auth/github/callback', [GitHubController::class, 'callback']);
 Route::get('/auth/google', [GoogleController::class, 'redirect']);
 Route::get('/auth/google/callback', [GoogleController::class, 'callback']);
 Route::get('/login', fn() => response()->json(['message' => 'Unauthorized'], 401))->name('login');
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/{any}', function () {
+    return view('index');
+})->where('any', '.*');
